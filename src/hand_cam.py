@@ -23,16 +23,10 @@ left = ([0, 0], [int(width/3), height])
 right = ([int(width/3*2), 0], [width, height])
 middle = ([int(width/3)+1, int(height/4)+1], [int(width/3*2)-1, int(height/4*3)-1])
 
-# ctrl_mode = ([top[0], top[1], (0, 0, 100)],
-#              [bottom[0], bottom[1], (0, 0, 100)],
-#              [left[0], left[1], (0, 100, 0)],
-#              [right[0], right[1], (0, 100, 0)],
-#              [middle[0], right[1], ])
-
 #storing tip id's for later use
 tip_id = [4, 8, 12, 16, 20]
 
-
+#function to process image and hand landmark
 def hand_func(handlm, landmark, img):
     for id, lm in enumerate(handlm.landmark):
         height, width, _ = img.shape
@@ -59,6 +53,7 @@ def hand_func(handlm, landmark, img):
             draw.draw_landmarks(img,handlm,hand_detect.HAND_CONNECTIONS,draw.DrawingSpec(color=(0,255,0),thickness=2,circle_radius=2),draw.DrawingSpec(color=(0,0,255),thickness=2,circle_radius=3))
             return landmark, finger_count
 
+# global variable that will be used in functions
 yaw_chace = 0
 yaw_rate = 0.2
 speed_rate = 3.0
@@ -79,6 +74,7 @@ def movement(x, y, z, ang):
 
     return temp_msg
     
+#control for forward, backward, yaw right, yaw left
 def control_xz(img, landmark, lable_chace):
 
     res = Twist()
@@ -95,8 +91,10 @@ def control_xz(img, landmark, lable_chace):
     cv.rectangle(overlay, right[0], right[1], (0, 100, 0), -1)
     cv.rectangle(overlay, middle[0], middle[1], (100, 0, 0), -1)
     img = cv.addWeighted(overlay, alpha, img, 1 - alpha, 0)
-
+    
+    #if landmark[9] is inside of specific boundaries, do this
     if cx > top[0][0] and cx < top[1][0] and cy > top[0][1] and cy < top[1][1]: 
+        #
         cv.rectangle(overlay, top[0], top[1], (0, 0, 255), -1)
         res = movement(speed_rate, 0.0, 0.0, 0.0) 
         lable = "forward"
@@ -127,6 +125,7 @@ def control_xz(img, landmark, lable_chace):
 
     return img, res, lable
 
+# control for upward, downward, left, right
 def control_yz(img, landmark, lable_chace):
     
     res = Twist()
@@ -169,7 +168,8 @@ def control_yz(img, landmark, lable_chace):
         lable = "idle"
 
     img = cv.addWeighted(overlay, alpha, img, 1 - alpha, 0)
-
+    
+    #print 
     if lable != lable_chace:
         print(rospy.get_caller_id() + ": " + lable)
 
@@ -199,8 +199,7 @@ def loiter_square(lable_chace):
     
     return res, lable
 
-
-
+  
 if __name__ == '__main__':
     rospy.init_node('hand_cam',)
     vel_pub = rospy.Publisher('velocity_commands', Twist, queue_size=10)
@@ -208,12 +207,12 @@ if __name__ == '__main__':
 
     rate = rospy.Rate(30)
     
-
-    lable = "" #used for chace 
+    #used for chace
+    lable = "" 
     finger_count = -1
     time_init = 0
     while not rospy.is_shutdown():
-        _, img = cap.read() #reads the video stream from the camera and return boolean value and the frame
+        _, img = cap.read() #read the video stream from the camera and return boolean value and the frame
         img = cv.flip(img, 1) #mirror image
         imgrgb = cv.cvtColor(img, cv.COLOR_BGR2RGB) #convert color to RGB, mediapipe library only works with RGB
         res = hand_param.process(imgrgb) #store landmark information
@@ -231,8 +230,7 @@ if __name__ == '__main__':
             else:
                 time_init = time.time() #restart the timer
 
-
-            
+            #choosing function based on how many fingers are opened and closed
             if finger_count == 0:
                 img, vel_msg, lable = control_xz(img, landmark, lable)
             elif finger_count == 1:
