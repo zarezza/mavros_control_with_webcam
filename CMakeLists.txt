@@ -212,6 +212,11 @@ catkin_install_python(PROGRAMS
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}  
 )
 
+catkin_install_python(PROGRAMS
+  src/cam_controller.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}  
+)
+
 add_executable(drone_control src/drone_control.cpp)
 target_link_libraries(drone_control 
       ${catkin_LIBRARIES}

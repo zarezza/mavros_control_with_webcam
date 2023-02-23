@@ -72,20 +72,18 @@ def control(img, landmark, capt, mode):
     img = cv.circle(img, capt, 20, (0, 255, 255), -1)
     img = cv.circle(img, ref_c, 20, (0, 255, 255), -1)
 
-    speed = [0.0, 0.0, 0.0, 0.0]
-
     if mode == 0:
-        speed[0] = (capt[1] - ref_c[1]) * 0.01
-        speed[1] = 0
-        speed[2] = 0
-        speed[3] = (capt[0] - ref_c[0]) * 0.01
-        res = movement(speed)
+        x = (capt[1] - ref_c[1]) * 0.01
+        y = 0
+        z = 0
+        ang_z = (capt[0] - ref_c[0]) * 0.003
+        res = movement(x, y, z, ang_z)
     elif mode == 1:
-        speed[0] = 0
-        speed[1] = (capt[0] - ref_c[0]) * 0.01
-        speed[2] = (capt[1] - ref_c[1]) * 0.01
-        speed[3] = 0
-        res = movement(speed)
+        x = 0
+        y = (capt[0] - ref_c[0]) * 0.01
+        z = (capt[1] - ref_c[1]) * 0.01
+        ang_z = 0
+        res = movement(x, y, z, ang_z)
     return img, res
 
 if __name__ == '__main__':
@@ -99,6 +97,7 @@ if __name__ == '__main__':
     time_init = time.time()
     capt = []
     capt_chace = []
+    speed = [0.0, 0.0, 0.0, 0.0]
     while not rospy.is_shutdown():
         _, img = cap.read() #reads the video stream from the camera and return boolean value and the frame
         img = cv.flip(img, 1) #mirror image
@@ -123,9 +122,9 @@ if __name__ == '__main__':
 
 
             if finger_count == 0:
-                img, vel_msg, speed = control(img, landmark, speed, capt, finger_count)
+                img, vel_msg = control(img, landmark, capt, finger_count)
             elif finger_count == 1:
-                img, vel_msg, speed = control(img, landmark, speed, capt, finger_count)
+                img, vel_msg = control(img, landmark, capt, finger_count)
             else: vel_msg = movement(0.0, 0.0, 0.0, 0.0)
 
             # rospy.loginfo(str_pub)
