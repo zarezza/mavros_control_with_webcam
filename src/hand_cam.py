@@ -23,12 +23,6 @@ left = ([0, 0], [int(width/3), height])
 right = ([int(width/3*2), 0], [width, height])
 middle = ([int(width/3)+1, int(height/4)+1], [int(width/3*2)-1, int(height/4*3)-1])
 
-# ctrl_mode = ([top[0], top[1], (0, 0, 100)],
-#              [bottom[0], bottom[1], (0, 0, 100)],
-#              [left[0], left[1], (0, 100, 0)],
-#              [right[0], right[1], (0, 100, 0)],
-#              [middle[0], right[1], ])
-
 #storing tip id's for later use
 tip_id = [4, 8, 12, 16, 20]
 
@@ -205,6 +199,7 @@ if __name__ == '__main__':
     rospy.init_node('hand_cam',)
     vel_pub = rospy.Publisher('velocity_commands', Twist, queue_size=10)
     vel_msg = Twist()
+
 
     rate = rospy.Rate(30)
     

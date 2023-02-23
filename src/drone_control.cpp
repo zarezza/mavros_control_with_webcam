@@ -103,16 +103,16 @@ int main(int argc, char **argv) {
         rate.sleep();
     }
 
-    bool tookOff = false;
+    bool is_takeoff = false;
     ros::Time takingoff;
 
-    while(ros::ok() && !tookOff) {
+    while(ros::ok() && !is_takeoff) {
         ros::spinOnce();
         rate.sleep();
-
-        if(!near_equal(current_pose.pose.position.z, 5, 0.1)) {
-            pose.pose.position.x = current_pose.pose.position.x;
-            pose.pose.position.y = current_pose.pose.position.y;
+        float current_height = current_pose.pose.position.z;
+        if(!(fabs(current_height - 5.0) < 0.1)) {
+            pose.pose.position.x = 0.0;
+            pose.pose.position.y = 0.0;
             pose.pose.position.z = 5.0;
 
             local_pos_pub.publish(pose);
@@ -127,7 +127,7 @@ int main(int argc, char **argv) {
             continue;
         }
 
-        tookOff = true;
+        is_takeoff = true;
     }
 
     while(ros::ok()) {
