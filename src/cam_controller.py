@@ -11,40 +11,16 @@ height = int(cap.get(4)) #height
 
 hand_detect = md.solutions.hands
 #set the parameters of object from mediapipe
-hand_param = hand_detect.Hands(max_num_hands = 1, #number of hands that can be detected
+hand_param = hand_detect.Hands(max_num_hands = 2, #number of hands that can be detected
                        min_detection_confidence = 0.5) #value for detection confidence, consider an image as succseful or not
 #get functions to draw landmarks and connections on the video frames
-draw = md.solutions.drawing_utils
 
+draw = md.solutions.drawing_utils
 #storing tip id's for later use
 tip_id = [4, 8, 12, 16, 20]
 
-
-def hand_func(handlm, landmark, img):
-    for id, lm in enumerate(handlm.landmark):
-        height, width, _ = img.shape
-        cx, cy = int(lm.x * width), int(lm.y * height)
-        landmark.append([id, cx, cy])
-        if len(landmark) != 0 and len(landmark) == 21: #true if landmark is not empty and 21 landmark detected
-            finger_count = 0
-
-            #check if its a right hand or left hand (not quite right)
-            if landmark[12][1] > landmark[20][1]: #true if MIDDLE_FINGER_TIP coordinates are greater than PINKY_TIP (left)
-                #print("left hand detected!")
-                if landmark[tip_id[0]][1] > landmark[tip_id[0]-1][1]: #true if THUMB_TIP coordinates are greater than THUMB_IP,
-                    finger_count += 1
-            else:
-                #print("right hand detected!")
-                if landmark[tip_id[0]][1] < landmark[tip_id[0]-1][1]:
-                    finger_count += 1
-
-            #count other finger
-            for id in range (1, 5): #since the THUMB_TIP already found before, skip index 0 and iterate all other finger
-                if landmark[tip_id[id]][2] < landmark[tip_id[id]-2][2]: #true if the coordinates of tip fingers are greater than coordinates of finger pip
-                    finger_count += 1
-
-            draw.draw_landmarks(img,handlm,hand_detect.HAND_CONNECTIONS,draw.DrawingSpec(color=(0,255,0),thickness=2,circle_radius=2),draw.DrawingSpec(color=(0,0,255),thickness=2,circle_radius=3))
-            return landmark, finger_count
+middle_right = [int(width/4*3), int(height/2)]
+middle_left = [int(width/4), int(height/2)]
 
 yaw_chace = 0
 yaw_rate = 0.04
@@ -65,26 +41,26 @@ def movement(x, y, z, ang):
 
     return temp_msg
 
-def control(img, landmark, capt, mode):
-    ref_c = (landmark[9][1], landmark[9][2])
+def process_landmark(handlm, landmark):
+    for id, lm in enumerate(handlm.landmark):
+        cx, cy = int(lm.x * width), int(lm.y * height)
+        landmark.append([id, cx, cy])
+    return landmark
 
-    img = cv.line(img, ref_c, capt, (0, 0, 0), 20)
-    img = cv.circle(img, capt, 20, (0, 255, 255), -1)
-    img = cv.circle(img, ref_c, 20, (0, 255, 255), -1)
+def process_finger(landmark):
+    finger_count = 0
+    for id in range(1, 5):
+        # print(landmark[tip_id[id]][0]) 
+        if landmark[tip_id[id]][2] < landmark[tip_id[id]-2][2]:
+            finger_count += 1
+    return finger_count
+    
+def midpoint(ax, ay, bx, by):
+    res = [0, 0]
+    res[0] = int((ax + bx)/2)
+    res[1] = int((ay + by)/2)
 
-    if mode == 0:
-        x = (capt[1] - ref_c[1]) * 0.01
-        y = 0
-        z = 0
-        ang_z = (capt[0] - ref_c[0]) * 0.003
-        res = movement(x, y, z, ang_z)
-    elif mode == 1:
-        x = 0
-        y = (capt[0] - ref_c[0]) * 0.01
-        z = (capt[1] - ref_c[1]) * 0.01
-        ang_z = 0
-        res = movement(x, y, z, ang_z)
-    return img, res
+    return res
 
 if __name__ == '__main__':
     rospy.init_node('hand_cam',)
@@ -95,41 +71,55 @@ if __name__ == '__main__':
 
     finger_count = -1
     time_init = time.time()
-    capt = []
-    capt_chace = []
-    speed = [0.0, 0.0, 0.0, 0.0]
     while not rospy.is_shutdown():
         _, img = cap.read() #reads the video stream from the camera and return boolean value and the frame
         img = cv.flip(img, 1) #mirror image
         imgrgb = cv.cvtColor(img, cv.COLOR_BGR2RGB) #convert color to RGB, mediapipe library only works with RGB
         res = hand_param.process(imgrgb) #store landmark information
-
+        
         landmark = []
-
+        ref_right = [0, 0, 0]
+        ref_left = [0, 0, 0]
+        x, y, z, ang_z = 0, 0, 0, 0
+        cv.circle(img, middle_left, 20, (0, 255, 255), -1)
+        cv.circle(img, middle_right, 20, (0, 255, 0), -1)
         if res.multi_hand_landmarks: #true if hand is detected in image
             #iterates over each hand landmarks data and stores the landmarks id and coordinates in the landmark
+            # print(res.multi_hand_landmarks) #prints all landmark without len
+            hand_count = 0
             for handlm in res.multi_hand_landmarks:
-                landmark, finger_chace = hand_func(handlm, landmark, img)
+                draw.draw_landmarks(img,handlm,hand_detect.HAND_CONNECTIONS,draw.DrawingSpec(color=(0,255,0),thickness=2,circle_radius=1),draw.DrawingSpec(color=(0,0,255),thickness=2,circle_radius=1))
+                landmark = process_landmark(handlm, landmark)
+            if len(landmark) == 42:
+                if landmark[20][1] > width/2 and landmark[41][1] < width/2:
+                    ref_right = landmark[:len(landmark)//2]
+                    ref_left = landmark[len(landmark)//2:]                  
+                else:
+                    ref_right = landmark[len(landmark)//2:]
+                    ref_left = landmark[:len(landmark)//2]
 
-            if finger_count != finger_chace: #to keep the function not changed imidietly
-                if time.time() - time_init > 0.7: #hold 0.7 sec if finger count changed value
-                    finger_count = finger_chace
-                    if finger_count == 0:
-                        capt = (landmark[9][1], landmark[9][2])
-                        capt_chace = capt
-            else:
-                time_init = time.time() #restart the timer
 
+                if process_finger(ref_right) == 0:
+                    mid_palm_right = midpoint(ref_right[1][1], ref_right[1][2], ref_right[13][1], ref_right[13][2])
+                    cv.circle(img, mid_palm_right, 20, (0, 0, 0), -1)
 
-            if finger_count == 0:
-                img, vel_msg = control(img, landmark, capt, finger_count)
-            elif finger_count == 1:
-                img, vel_msg = control(img, landmark, capt, finger_count)
-            else: vel_msg = movement(0.0, 0.0, 0.0, 0.0)
+                    x = (middle_right[1] - mid_palm_right[1]) * 0.05
+                    ang_z = (middle_right[0] - mid_palm_right[0]) * 0.003
+                    
+                if process_finger(ref_left) == 0:
+                    mid_palm_left = midpoint(ref_left[1][1], ref_left[1][2], ref_left[13][1], ref_left[13][2])
+                    cv.circle(img, mid_palm_left, 20, (0, 0, 0), -1)
 
-            # rospy.loginfo(str_pub)
+                    y = (middle_left[0] - mid_palm_left[0]) * 0.05
+                    z = (middle_left[1] - mid_palm_left[1]) * 0.05
+                    
+                print("x:\t%.2f" % x)
+                print("y:\t%.2f" % y)
+                print("z:\t%.2f" % z)
+                print("ang_z:\t%.2f" % ang_z + "\n") 
+                vel_msg = movement(x, y, z, ang_z)
+            else: vel_msg = movement(x, y, z, ang_z)
             vel_pub.publish(vel_msg)
-
         cv.imshow("RESULT",img)
 
         #press q to quit
